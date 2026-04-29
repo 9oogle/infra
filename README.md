@@ -302,7 +302,6 @@ git push origin main
 | 서비스 | URL |
 |--------|-----|
 | Kafka UI | http://34.50.50.68:8989 |
-| Redis Insight | http://34.47.126.116:8001 |
 | Grafana | http://34.50.39.161:3000 |
 | Prometheus | http://34.50.39.161:9090 |
 | Zipkin | http://34.50.39.161:9411 |

@@ -49,20 +49,21 @@ services:
     container_name: sentinel
     ports:
       - "26379:26379"
-    command: >
+    command: |
       sh -c "
-        printf 'bind 0.0.0.0\nprotected-mode no\nsentinel monitor mymaster ${REDIS_MASTER_HOST} 6379 2\nsentinel auth-pass mymaster ${REDIS_PASSWORD}\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 60000\nsentinel parallel-syncs mymaster 1\nsentinel announce-ip ${SENTINEL_HOST}\nsentinel announce-port 26379\n' > /tmp/sentinel.conf &&
+        {
+          echo 'bind 0.0.0.0'
+          echo 'protected-mode no'
+          echo 'sentinel monitor mymaster ${REDIS_MASTER_HOST} 6379 2'
+          echo 'sentinel auth-pass mymaster ${REDIS_PASSWORD}'
+          echo 'sentinel down-after-milliseconds mymaster 5000'
+          echo 'sentinel failover-timeout mymaster 60000'
+          echo 'sentinel parallel-syncs mymaster 1'
+          echo 'sentinel announce-ip ${SENTINEL_HOST}'
+          echo 'sentinel announce-port 26379'
+        } > /tmp/sentinel.conf &&
         redis-sentinel /tmp/sentinel.conf
       "
-    restart: unless-stopped
-
-  # redis-1 VM에서만 실행 (--profile master 에 포함)
-  redis-insight:
-    image: redislabs/redisinsight:latest
-    container_name: redis-insight
-    profiles: ["master"]
-    ports:
-      - "8001:8001"
     restart: unless-stopped
 
   # Prometheus용 Redis 메트릭 노출 (master/replica 모두 실행)
