@@ -1,0 +1,154 @@
+name: 인프라 자동 배포
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      kafka:      ${{ steps.changes.outputs.kafka }}
+      redis:      ${{ steps.changes.outputs.redis }}
+      monitoring: ${{ steps.changes.outputs.monitoring }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            kafka:
+              - 'kafka-vm/**'
+            redis:
+              - 'redis-vm/**'
+            monitoring:
+              - 'monitering-vm/**'
+
+  deploy-kafka:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.kafka == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH 키 설정
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+      - name: Kafka-1 VM 배포 (kafka-ui 포함)
+        run: |
+          ssh ${{ secrets.KAFKA_1_VM_HOST }} "cat > ~/infra/kafka-vm/.env" << 'EOF'
+          KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
+          BROKER_ID=1
+          KAFKA_HOST=10.178.0.3
+          KAFKA_1_HOST=10.178.0.3
+          KAFKA_2_HOST=10.178.0.4
+          KAFKA_3_HOST=10.178.0.5
+          EOF
+          ssh ${{ secrets.KAFKA_1_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd kafka-vm && docker compose pull && docker compose --profile ui up -d
+          EOF
+      - name: Kafka-2 VM 배포
+        run: |
+          ssh ${{ secrets.KAFKA_2_VM_HOST }} "cat > ~/infra/kafka-vm/.env" << 'EOF'
+          KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
+          BROKER_ID=2
+          KAFKA_HOST=10.178.0.4
+          KAFKA_1_HOST=10.178.0.3
+          KAFKA_2_HOST=10.178.0.4
+          KAFKA_3_HOST=10.178.0.5
+          EOF
+          ssh ${{ secrets.KAFKA_2_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd kafka-vm && docker compose pull && docker compose up -d
+          EOF
+      - name: Kafka-3 VM 배포
+        run: |
+          ssh ${{ secrets.KAFKA_3_VM_HOST }} "cat > ~/infra/kafka-vm/.env" << 'EOF'
+          KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
+          BROKER_ID=3
+          KAFKA_HOST=10.178.0.5
+          KAFKA_1_HOST=10.178.0.3
+          KAFKA_2_HOST=10.178.0.4
+          KAFKA_3_HOST=10.178.0.5
+          EOF
+          ssh ${{ secrets.KAFKA_3_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd kafka-vm && docker compose pull && docker compose up -d
+          EOF
+
+  deploy-redis:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.redis == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH 키 설정
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+      - name: Redis-1 VM 배포 (master)
+        run: |
+          ssh ${{ secrets.REDIS_1_VM_HOST }} "cat > ~/infra/redis-vm/.env" << 'EOF'
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          REDIS_MASTER_HOST=10.178.0.8
+          SENTINEL_HOST=10.178.0.8
+          EOF
+          ssh ${{ secrets.REDIS_1_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd redis-vm && docker compose pull && docker compose --profile master up -d
+          EOF
+      - name: Redis-2 VM 배포 (replica)
+        run: |
+          ssh ${{ secrets.REDIS_2_VM_HOST }} "cat > ~/infra/redis-vm/.env" << 'EOF'
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          REDIS_MASTER_HOST=10.178.0.8
+          SENTINEL_HOST=10.178.0.7
+          EOF
+          ssh ${{ secrets.REDIS_2_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd redis-vm && docker compose pull && docker compose --profile replica up -d
+          EOF
+      - name: Redis-3 VM 배포 (replica)
+        run: |
+          ssh ${{ secrets.REDIS_3_VM_HOST }} "cat > ~/infra/redis-vm/.env" << 'EOF'
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          REDIS_MASTER_HOST=10.178.0.8
+          SENTINEL_HOST=10.178.0.9
+          EOF
+          ssh ${{ secrets.REDIS_3_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd redis-vm && docker compose pull && docker compose --profile replica up -d
+          EOF
+
+  deploy-monitoring:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.monitoring == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH 키 설정
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+      - name: 모니터링 VM 배포
+        run: |
+          ssh ${{ secrets.MONITORING_VM_HOST }} "cat > ~/infra/monitering-vm/.env" << 'EOF'
+          GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
+          KAFKA_1_HOST=10.178.0.3
+          KAFKA_2_HOST=10.178.0.4
+          KAFKA_3_HOST=10.178.0.5
+          REDIS_1_HOST=10.178.0.8
+          REDIS_2_HOST=10.178.0.7
+          REDIS_3_HOST=10.178.0.9
+          EOF
+          ssh ${{ secrets.MONITORING_VM_HOST }} << 'EOF'
+            cd ~/infra && git pull
+            cd monitering-vm && docker compose pull && docker compose up -d
+          EOF

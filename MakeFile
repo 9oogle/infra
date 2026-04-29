@@ -1,0 +1,101 @@
+# ================================================
+# 고글에듀 인프라 Makefile
+# make all-up 하나로 전체 인프라 배포
+# (Config/Service/Payment는 각 앱 레포에서 배포)
+# ================================================
+
+# SSH 호스트 설정 (~/.ssh/config에 등록 필요)
+KAFKA_1_VM    = goggle-kafka-1
+KAFKA_2_VM    = goggle-kafka-2
+KAFKA_3_VM    = goggle-kafka-3
+REDIS_1_VM    = goggle-redis-1
+REDIS_2_VM    = goggle-redis-2
+REDIS_3_VM    = goggle-redis-3
+MONITORING_VM = goggle-monitoring
+
+# 각 VM의 작업 디렉토리
+REMOTE_DIR = ~/infra
+
+.PHONY: all-up all-down \
+        kafka-up kafka-down kafka-1-up kafka-2-up kafka-3-up \
+        redis-up redis-down redis-1-up redis-2-up redis-3-up \
+        monitoring-up monitoring-down \
+        status sync sync-and-up
+
+# ── 전체 ──────────────────────────────────────
+all-up: kafka-up redis-up monitoring-up
+	@echo "✅ 전체 인프라 배포 완료"
+
+all-down: monitoring-down redis-down kafka-down
+	@echo "🛑 전체 인프라 중지 완료"
+
+# ── Kafka ─────────────────────────────────────
+kafka-up: kafka-1-up kafka-2-up kafka-3-up
+	@echo "✅ Kafka 클러스터 배포 완료"
+
+kafka-down:
+	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose --profile ui down"
+	ssh $(KAFKA_2_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose down"
+	ssh $(KAFKA_3_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose down"
+
+kafka-1-up:
+	@echo "🚀 Kafka-1 VM 배포 중..."
+	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose pull && docker compose --profile ui up -d"
+
+kafka-2-up:
+	@echo "🚀 Kafka-2 VM 배포 중..."
+	ssh $(KAFKA_2_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose pull && docker compose up -d"
+
+kafka-3-up:
+	@echo "🚀 Kafka-3 VM 배포 중..."
+	ssh $(KAFKA_3_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose pull && docker compose up -d"
+
+# ── Redis ─────────────────────────────────────
+redis-up: redis-1-up redis-2-up redis-3-up
+	@echo "✅ Redis 클러스터 배포 완료"
+
+redis-down:
+	ssh $(REDIS_1_VM) "cd $(REMOTE_DIR)/redis-vm && docker compose --profile master down"
+	ssh $(REDIS_2_VM) "cd $(REMOTE_DIR)/redis-vm && docker compose --profile replica down"
+	ssh $(REDIS_3_VM) "cd $(REMOTE_DIR)/redis-vm && docker compose --profile replica down"
+
+redis-1-up:
+	@echo "🚀 Redis-1 VM 배포 중 (master)..."
+	ssh $(REDIS_1_VM) "cd $(REMOTE_DIR)/redis-vm && docker compose pull && docker compose --profile master up -d"
+
+redis-2-up:
+	@echo "🚀 Redis-2 VM 배포 중 (replica)..."
+	ssh $(REDIS_2_VM) "cd $(REMOTE_DIR)/redis-vm && docker compose pull && docker compose --profile replica up -d"
+
+redis-3-up:
+	@echo "🚀 Redis-3 VM 배포 중 (replica)..."
+	ssh $(REDIS_3_VM) "cd $(REMOTE_DIR)/redis-vm && docker compose pull && docker compose --profile replica up -d"
+
+# ── 모니터링 ──────────────────────────────────
+monitoring-up:
+	@echo "🚀 모니터링 VM 배포 중..."
+	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitering-vm && docker compose pull && docker compose up -d"
+
+monitoring-down:
+	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitering-vm && docker compose down"
+
+
+# ── 전체 상태 확인 ─────────────────────────────
+status:
+	@echo "=== Kafka ===" && ssh $(KAFKA_1_VM) "docker compose -f $(REMOTE_DIR)/kafka-vm/docker-compose.yml ps"
+	@echo "=== Redis ===" && ssh $(REDIS_1_VM) "docker compose -f $(REMOTE_DIR)/redis-vm/docker-compose.yml ps"
+	@echo "=== Monitoring ===" && ssh $(MONITORING_VM) "docker compose -f $(REMOTE_DIR)/monitering-vm/docker-compose.yml ps"
+
+# ── 코드 동기화 (레포 → 각 VM) ────────────────
+sync:
+	@echo "📦 각 VM에 최신 코드 동기화 중..."
+	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR) && git pull"
+	ssh $(KAFKA_2_VM) "cd $(REMOTE_DIR) && git pull"
+	ssh $(KAFKA_3_VM) "cd $(REMOTE_DIR) && git pull"
+	ssh $(REDIS_1_VM) "cd $(REMOTE_DIR) && git pull"
+	ssh $(REDIS_2_VM) "cd $(REMOTE_DIR) && git pull"
+	ssh $(REDIS_3_VM) "cd $(REMOTE_DIR) && git pull"
+	ssh $(MONITORING_VM) "cd $(REMOTE_DIR) && git pull"
+	@echo "✅ 동기화 완료"
+
+sync-and-up: sync all-up
