@@ -34,15 +34,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: SSH 키 설정
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-      - name: Kafka-1 VM 배포 (kafka-ui 포함)
+
+      - name: Kafka-1 .env 생성
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }} "cat > ~/infra/kafka-vm/.env" << 'EOF'
+          cat > kafka-vm/.env << EOF
           KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
           BROKER_ID=1
           KAFKA_HOST=10.178.0.3
@@ -50,13 +52,17 @@ jobs:
           KAFKA_2_HOST=10.178.0.4
           KAFKA_3_HOST=10.178.0.5
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd kafka-vm && docker compose pull && docker compose --profile ui up -d
-          EOF
-      - name: Kafka-2 VM 배포
+
+      - name: Kafka-1 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }} "cat > ~/infra/kafka-vm/.env" << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }} "mkdir -p ~/infra/kafka-vm"
+          scp -r kafka-vm/ ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }} \
+            "cd ~/infra/kafka-vm && docker compose pull && docker compose --profile ui up -d"
+
+      - name: Kafka-2 .env 생성
+        run: |
+          cat > kafka-vm/.env << EOF
           KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
           BROKER_ID=2
           KAFKA_HOST=10.178.0.4
@@ -64,13 +70,17 @@ jobs:
           KAFKA_2_HOST=10.178.0.4
           KAFKA_3_HOST=10.178.0.5
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd kafka-vm && docker compose pull && docker compose up -d
-          EOF
-      - name: Kafka-3 VM 배포
+
+      - name: Kafka-2 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }} "cat > ~/infra/kafka-vm/.env" << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }} "mkdir -p ~/infra/kafka-vm"
+          scp -r kafka-vm/ ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }} \
+            "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
+
+      - name: Kafka-3 .env 생성
+        run: |
+          cat > kafka-vm/.env << EOF
           KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
           BROKER_ID=3
           KAFKA_HOST=10.178.0.5
@@ -78,10 +88,13 @@ jobs:
           KAFKA_2_HOST=10.178.0.4
           KAFKA_3_HOST=10.178.0.5
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd kafka-vm && docker compose pull && docker compose up -d
-          EOF
+
+      - name: Kafka-3 파일 전송 및 배포
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }} "mkdir -p ~/infra/kafka-vm"
+          scp -r kafka-vm/ ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }} \
+            "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
 
   deploy-redis:
     needs: detect-changes
@@ -89,45 +102,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: SSH 키 설정
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-      - name: Redis-1 VM 배포 (master)
+
+      - name: Redis-1 .env 생성 (master)
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }} "cat > ~/infra/redis-vm/.env" << 'EOF'
+          cat > redis-vm/.env << EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           REDIS_MASTER_HOST=10.178.0.8
           SENTINEL_HOST=10.178.0.8
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd redis-vm && docker compose pull && docker compose --profile master up -d
-          EOF
-      - name: Redis-2 VM 배포 (replica)
+
+      - name: Redis-1 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }} "cat > ~/infra/redis-vm/.env" << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }} "mkdir -p ~/infra/redis-vm"
+          scp -r redis-vm/ ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }} \
+            "cd ~/infra/redis-vm && docker compose pull && docker compose --profile master up -d"
+
+      - name: Redis-2 .env 생성 (replica)
+        run: |
+          cat > redis-vm/.env << EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           REDIS_MASTER_HOST=10.178.0.8
           SENTINEL_HOST=10.178.0.7
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd redis-vm && docker compose pull && docker compose --profile replica up -d
-          EOF
-      - name: Redis-3 VM 배포 (replica)
+
+      - name: Redis-2 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }} "cat > ~/infra/redis-vm/.env" << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }} "mkdir -p ~/infra/redis-vm"
+          scp -r redis-vm/ ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }} \
+            "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
+
+      - name: Redis-3 .env 생성 (replica)
+        run: |
+          cat > redis-vm/.env << EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           REDIS_MASTER_HOST=10.178.0.8
           SENTINEL_HOST=10.178.0.9
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd redis-vm && docker compose pull && docker compose --profile replica up -d
-          EOF
+
+      - name: Redis-3 파일 전송 및 배포
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }} "mkdir -p ~/infra/redis-vm"
+          scp -r redis-vm/ ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }} \
+            "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
 
   deploy-monitoring:
     needs: detect-changes
@@ -135,15 +161,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: SSH 키 설정
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-      - name: 모니터링 VM 배포
+
+      - name: 모니터링 .env 생성
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} "cat > ~/infra/monitoring-vm/.env" << 'EOF'
+          cat > monitoring-vm/.env << EOF
           GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
           KAFKA_1_HOST=10.178.0.3
           KAFKA_2_HOST=10.178.0.4
@@ -152,7 +180,10 @@ jobs:
           REDIS_2_HOST=10.178.0.7
           REDIS_3_HOST=10.178.0.9
           EOF
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} << 'EOF'
-            cd ~/infra && git pull
-            cd monitoring-vm && docker compose pull && docker compose up -d
-          EOF
+
+      - name: 모니터링 파일 전송 및 배포
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} "mkdir -p ~/infra/monitoring-vm"
+          scp -r monitoring-vm/ ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }}:~/infra/
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} \
+            "cd ~/infra/monitoring-vm && docker compose pull && docker compose up -d"
