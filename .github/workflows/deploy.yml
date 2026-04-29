@@ -3,6 +3,7 @@ name: 인프라 자동 배포
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   detect-changes:
@@ -19,10 +20,13 @@ jobs:
           filters: |
             kafka:
               - 'kafka-vm/**'
+              - '.github/workflows/deploy.yml'
             redis:
               - 'redis-vm/**'
+              - '.github/workflows/deploy.yml'
             monitoring:
-              - 'monitering-vm/**'
+              - 'monitoring-vm/**'
+              - '.github/workflows/deploy.yml'
 
   deploy-kafka:
     needs: detect-changes
@@ -139,7 +143,7 @@ jobs:
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
       - name: 모니터링 VM 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} "cat > ~/infra/monitering-vm/.env" << 'EOF'
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} "cat > ~/infra/monitoring-vm/.env" << 'EOF'
           GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
           KAFKA_1_HOST=10.178.0.3
           KAFKA_2_HOST=10.178.0.4
@@ -150,5 +154,5 @@ jobs:
           EOF
           ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} << 'EOF'
             cd ~/infra && git pull
-            cd monitering-vm && docker compose pull && docker compose up -d
+            cd monitoring-vm && docker compose pull && docker compose up -d
           EOF

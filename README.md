@@ -139,7 +139,7 @@ spring:
 ## 모니터링 (Prometheus + Grafana)
 
 ### 1. .env 파일 생성
-`monitering-vm/.env.example`을 복사해서 `.env`로 생성 후 IP 입력.
+`monitoring-vm/.env.example`을 복사해서 `.env`로 생성 후 IP 입력.
 
 ### 2. 기동
 ```bash
@@ -150,9 +150,9 @@ make monitoring-up
 ### 3. IP 변경 시 Prometheus 재설정
 ```bash
 # monitoring VM에서
-cd ~/infra/monitering-vm
+cd ~/infra/monitoring-vm
 docker compose down
-docker volume rm monitering-vm_prometheus-config
+docker volume rm monitoring-vm_prometheus-config
 docker compose up -d
 ```
 

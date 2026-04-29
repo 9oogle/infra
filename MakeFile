@@ -74,17 +74,17 @@ redis-3-up:
 # ── 모니터링 ──────────────────────────────────
 monitoring-up:
 	@echo "🚀 모니터링 VM 배포 중..."
-	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitering-vm && docker compose pull && docker compose up -d"
+	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitoring-vm && docker compose pull && docker compose up -d"
 
 monitoring-down:
-	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitering-vm && docker compose down"
+	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitoring-vm && docker compose down"
 
 
 # ── 전체 상태 확인 ─────────────────────────────
 status:
 	@echo "=== Kafka ===" && ssh $(KAFKA_1_VM) "docker compose -f $(REMOTE_DIR)/kafka-vm/docker-compose.yml ps"
 	@echo "=== Redis ===" && ssh $(REDIS_1_VM) "docker compose -f $(REMOTE_DIR)/redis-vm/docker-compose.yml ps"
-	@echo "=== Monitoring ===" && ssh $(MONITORING_VM) "docker compose -f $(REMOTE_DIR)/monitering-vm/docker-compose.yml ps"
+	@echo "=== Monitoring ===" && ssh $(MONITORING_VM) "docker compose -f $(REMOTE_DIR)/monitoring-vm/docker-compose.yml ps"
 
 # ── 코드 동기화 (레포 → 각 VM) ────────────────
 sync:
