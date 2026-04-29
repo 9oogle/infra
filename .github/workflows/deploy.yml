@@ -47,10 +47,10 @@ jobs:
           cat > kafka-vm/.env << EOF
           KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
           BROKER_ID=1
-          KAFKA_HOST=10.178.0.3
-          KAFKA_1_HOST=10.178.0.3
-          KAFKA_2_HOST=10.178.0.4
-          KAFKA_3_HOST=10.178.0.5
+          KAFKA_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
+          KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
+          KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
+          KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
           EOF
 
       - name: Kafka-1 파일 전송 및 배포
@@ -65,10 +65,10 @@ jobs:
           cat > kafka-vm/.env << EOF
           KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
           BROKER_ID=2
-          KAFKA_HOST=10.178.0.4
-          KAFKA_1_HOST=10.178.0.3
-          KAFKA_2_HOST=10.178.0.4
-          KAFKA_3_HOST=10.178.0.5
+          KAFKA_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
+          KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
+          KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
+          KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
           EOF
 
       - name: Kafka-2 파일 전송 및 배포
@@ -83,10 +83,10 @@ jobs:
           cat > kafka-vm/.env << EOF
           KAFKA_CLUSTER_ID=${{ secrets.KAFKA_CLUSTER_ID }}
           BROKER_ID=3
-          KAFKA_HOST=10.178.0.5
-          KAFKA_1_HOST=10.178.0.3
-          KAFKA_2_HOST=10.178.0.4
-          KAFKA_3_HOST=10.178.0.5
+          KAFKA_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
+          KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
+          KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
+          KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
           EOF
 
       - name: Kafka-3 파일 전송 및 배포
@@ -114,8 +114,8 @@ jobs:
         run: |
           cat > redis-vm/.env << EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-          REDIS_MASTER_HOST=10.178.0.8
-          SENTINEL_HOST=10.178.0.8
+          REDIS_MASTER_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
+          SENTINEL_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
           EOF
 
       - name: Redis-1 파일 전송 및 배포
@@ -129,8 +129,8 @@ jobs:
         run: |
           cat > redis-vm/.env << EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-          REDIS_MASTER_HOST=10.178.0.8
-          SENTINEL_HOST=10.178.0.7
+          REDIS_MASTER_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
+          SENTINEL_HOST=${{ secrets.REDIS_2_INTERNAL_IP }}
           EOF
 
       - name: Redis-2 파일 전송 및 배포
@@ -144,8 +144,8 @@ jobs:
         run: |
           cat > redis-vm/.env << EOF
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-          REDIS_MASTER_HOST=10.178.0.8
-          SENTINEL_HOST=10.178.0.9
+          REDIS_MASTER_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
+          SENTINEL_HOST=${{ secrets.REDIS_3_INTERNAL_IP }}
           EOF
 
       - name: Redis-3 파일 전송 및 배포
@@ -173,12 +173,12 @@ jobs:
         run: |
           cat > monitoring-vm/.env << EOF
           GRAFANA_PASSWORD=${{ secrets.GRAFANA_PASSWORD }}
-          KAFKA_1_HOST=10.178.0.3
-          KAFKA_2_HOST=10.178.0.4
-          KAFKA_3_HOST=10.178.0.5
-          REDIS_1_HOST=10.178.0.8
-          REDIS_2_HOST=10.178.0.7
-          REDIS_3_HOST=10.178.0.9
+          KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
+          KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
+          KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
+          REDIS_1_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
+          REDIS_2_HOST=${{ secrets.REDIS_2_INTERNAL_IP }}
+          REDIS_3_HOST=${{ secrets.REDIS_3_INTERNAL_IP }}
           EOF
 
       - name: 모니터링 파일 전송 및 배포
