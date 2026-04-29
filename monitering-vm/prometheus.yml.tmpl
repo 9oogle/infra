@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ── Kafka 브로커 메트릭 ────────────────────────
+  - job_name: 'kafka'
+    static_configs:
+      - targets:
+          - '${KAFKA_1_HOST}:9308'
+          - '${KAFKA_2_HOST}:9308'
+          - '${KAFKA_3_HOST}:9308'
+        labels:
+          cluster: 'goggle-kafka'
+
+  # ── Redis 메트릭 ───────────────────────────────
+  - job_name: 'redis'
+    static_configs:
+      - targets:
+          - '${REDIS_1_HOST}:9121'
+          - '${REDIS_2_HOST}:9121'
+          - '${REDIS_3_HOST}:9121'
+        labels:
+          cluster: 'goggle-redis'
+
+  # ── 각 VM 시스템 메트릭 (Node Exporter) ────────
+  - job_name: 'node-kafka'
+    static_configs:
+      - targets:
+          - '${KAFKA_1_HOST}:9100'
+          - '${KAFKA_2_HOST}:9100'
+          - '${KAFKA_3_HOST}:9100'
+        labels:
+          group: 'kafka'
+
+  - job_name: 'node-redis'
+    static_configs:
+      - targets:
+          - '${REDIS_1_HOST}:9100'
+          - '${REDIS_2_HOST}:9100'
+          - '${REDIS_3_HOST}:9100'
+        labels:
+          group: 'redis'
+
+  # ── Prometheus 자체 메트릭 ─────────────────────
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
