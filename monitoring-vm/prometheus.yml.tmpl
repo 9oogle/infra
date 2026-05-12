@@ -42,6 +42,47 @@ scrape_configs:
         labels:
           group: 'redis'
 
+  # ── 서비스 메트릭 ──────────────────────────────
+  - job_name: 'mentoring-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - '${MENTORING_SERVICE_HOST}:9006'
+        labels:
+          service: 'mentoring-service'
+
+  - job_name: 'order-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - '${ORDER_SERVICE_HOST}:9007'
+        labels:
+          service: 'order-service'
+
+  - job_name: 'lecture-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - '${LECTURE_SERVICE_HOST}:9005'
+        labels:
+          service: 'lecture-service'
+
+  - job_name: 'payment-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - '${PAYMENT_SERVICE_HOST}:9008'
+        labels:
+          service: 'payment-service'
+
+  - job_name: 'user-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets:
+          - '${USER_SERVICE_HOST}:9010'
+        labels:
+          service: 'user-service'
+
   # ── Prometheus 자체 메트릭 ─────────────────────
   - job_name: 'prometheus'
     static_configs:

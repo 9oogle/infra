@@ -192,6 +192,10 @@ jobs:
           REDIS_2_HOST=${{ secrets.REDIS_2_INTERNAL_IP }}
           REDIS_3_HOST=${{ secrets.REDIS_3_INTERNAL_IP }}
           MENTORING_SERVICE_HOST=${{ secrets.VM_HOST }}
+          ORDER_SERVICE_HOST=${{ secrets.VM_HOST }}
+          LECTURE_SERVICE_HOST=${{ secrets.VM_HOST }}
+          PAYMENT_SERVICE_HOST=${{ secrets.VM_HOST }}
+          USER_SERVICE_HOST=${{ secrets.VM_HOST }}
           EOF
 
       - name: 모니터링 파일 전송 및 배포
