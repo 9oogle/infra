@@ -38,6 +38,17 @@ services:
       - prometheus
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    restart: unless-stopped
+
   zipkin:
     image: openzipkin/zipkin:latest
     container_name: zipkin
@@ -59,4 +70,5 @@ volumes:
   prometheus-config:
   prometheus-data:
   grafana-data:
+  loki-data:
   portainer-data:

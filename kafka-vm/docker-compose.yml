@@ -5,14 +5,19 @@ services:
     ports:
       - "9092:9092"
       - "29093:29093"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
     environment:
       CLUSTER_ID: ${KAFKA_CLUSTER_ID}
       KAFKA_NODE_ID: ${BROKER_ID}
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${KAFKA_HOST}:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENERS: SSL://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093
+      KAFKA_ADVERTISED_LISTENERS: SSL://${KAFKA_HOST}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@${KAFKA_1_HOST}:29093,2@${KAFKA_2_HOST}:29093,3@${KAFKA_3_HOST}:29093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
@@ -21,8 +26,15 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"
       KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_SSL_KEYSTORE_FILENAME: ${BROKER_KEYSTORE_FILENAME}
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: keystore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: keystore_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: truststore_creds
+      KAFKA_SSL_CLIENT_AUTH: none
     volumes:
       - kafka-data:/var/lib/kafka/data
+      - ./ssl:/etc/kafka/secrets
     restart: unless-stopped
 
   # kafka-1 VM에서만 실행: docker compose --profile ui up -d
@@ -34,9 +46,20 @@ services:
       - kafka
     ports:
       - "8989:8080"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
     environment:
       KAFKA_CLUSTERS_0_NAME: goggle-edu
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_1_HOST}:9092,${KAFKA_2_HOST}:9092,${KAFKA_3_HOST}:9092
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SSL
+      KAFKA_CLUSTERS_0_SSL_TRUSTSTORELOCATION: /etc/kafka/secrets/kafka.truststore.jks
+      KAFKA_CLUSTERS_0_SSL_TRUSTSTOREPASSWORD: ${TRUSTSTORE_PASSWORD}
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    volumes:
+      - ./ssl:/etc/kafka/secrets
     restart: unless-stopped
 
   # Prometheus용 Kafka 메트릭 노출 (브로커 3대 모두 실행)
@@ -45,9 +68,16 @@ services:
     container_name: kafka-exporter
     ports:
       - "9308:9308"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
     command:
       - --kafka.server=kafka:9092
       - --kafka.version=3.5.0
+      - --tls.enabled
+      - --tls.insecure-skip-tls-verify
     depends_on:
       - kafka
     restart: unless-stopped
@@ -57,6 +87,11 @@ services:
     container_name: node-exporter
     ports:
       - "9100:9100"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -67,11 +102,31 @@ services:
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
 
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    env_file: .env
+    restart: unless-stopped
+
   portainer-agent:
     image: portainer/agent:latest
     container_name: portainer-agent
     ports:
       - "9001:9001"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
