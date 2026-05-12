@@ -51,6 +51,9 @@ jobs:
           KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
           KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
           KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
+          BROKER_KEYSTORE_FILENAME=broker-1.keystore.jks
+          LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
+          TRUSTSTORE_PASSWORD=${{ secrets.TRUST_STORE_PASSWORD }}
           EOF
 
       - name: Kafka-1 파일 전송 및 배포
@@ -69,6 +72,9 @@ jobs:
           KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
           KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
           KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
+          BROKER_KEYSTORE_FILENAME=broker-2.keystore.jks
+          LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
+          TRUSTSTORE_PASSWORD=${{ secrets.TRUST_STORE_PASSWORD }}
           EOF
 
       - name: Kafka-2 파일 전송 및 배포
@@ -87,6 +93,9 @@ jobs:
           KAFKA_1_HOST=${{ secrets.KAFKA_1_INTERNAL_IP }}
           KAFKA_2_HOST=${{ secrets.KAFKA_2_INTERNAL_IP }}
           KAFKA_3_HOST=${{ secrets.KAFKA_3_INTERNAL_IP }}
+          BROKER_KEYSTORE_FILENAME=broker-3.keystore.jks
+          LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
+          TRUSTSTORE_PASSWORD=${{ secrets.TRUST_STORE_PASSWORD }}
           EOF
 
       - name: Kafka-3 파일 전송 및 배포
@@ -116,6 +125,7 @@ jobs:
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           REDIS_MASTER_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
           SENTINEL_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
+          LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
           EOF
 
       - name: Redis-1 파일 전송 및 배포
@@ -131,6 +141,7 @@ jobs:
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           REDIS_MASTER_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
           SENTINEL_HOST=${{ secrets.REDIS_2_INTERNAL_IP }}
+          LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
           EOF
 
       - name: Redis-2 파일 전송 및 배포
@@ -146,6 +157,7 @@ jobs:
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           REDIS_MASTER_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
           SENTINEL_HOST=${{ secrets.REDIS_3_INTERNAL_IP }}
+          LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
           EOF
 
       - name: Redis-3 파일 전송 및 배포
@@ -179,6 +191,7 @@ jobs:
           REDIS_1_HOST=${{ secrets.REDIS_1_INTERNAL_IP }}
           REDIS_2_HOST=${{ secrets.REDIS_2_INTERNAL_IP }}
           REDIS_3_HOST=${{ secrets.REDIS_3_INTERNAL_IP }}
+          MENTORING_SERVICE_HOST=${{ secrets.VM_HOST }}
           EOF
 
       - name: 모니터링 파일 전송 및 배포
