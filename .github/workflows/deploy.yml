@@ -41,6 +41,28 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host kafka-jump
+            HostName ${{ secrets.KAFKA_1_VM_HOST }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+
+          Host kafka-2-internal
+            HostName ${{ secrets.KAFKA_2_INTERNAL_IP }}
+            User ${{ secrets.SSH_USER }}
+            ProxyJump kafka-jump
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+
+          Host kafka-3-internal
+            HostName ${{ secrets.KAFKA_3_INTERNAL_IP }}
+            User ${{ secrets.SSH_USER }}
+            ProxyJump kafka-jump
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Kafka-1 .env 생성
         run: |
@@ -79,10 +101,9 @@ jobs:
 
       - name: Kafka-2 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }} "mkdir -p ~/infra/kafka-vm"
-          scp -r kafka-vm/ ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_2_VM_HOST }} \
-            "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
+          ssh kafka-2-internal "mkdir -p ~/infra/kafka-vm"
+          scp -r kafka-vm/ kafka-2-internal:~/infra/
+          ssh kafka-2-internal "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
 
       - name: Kafka-3 .env 생성
         run: |
@@ -100,10 +121,9 @@ jobs:
 
       - name: Kafka-3 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }} "mkdir -p ~/infra/kafka-vm"
-          scp -r kafka-vm/ ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_3_VM_HOST }} \
-            "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
+          ssh kafka-3-internal "mkdir -p ~/infra/kafka-vm"
+          scp -r kafka-vm/ kafka-3-internal:~/infra/
+          ssh kafka-3-internal "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
 
   deploy-redis:
     needs: detect-changes
@@ -118,6 +138,28 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host redis-jump
+            HostName ${{ secrets.REDIS_1_VM_HOST }}
+            User ${{ secrets.SSH_USER }}
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+
+          Host redis-2-internal
+            HostName ${{ secrets.REDIS_2_INTERNAL_IP }}
+            User ${{ secrets.SSH_USER }}
+            ProxyJump redis-jump
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+
+          Host redis-3-internal
+            HostName ${{ secrets.REDIS_3_INTERNAL_IP }}
+            User ${{ secrets.SSH_USER }}
+            ProxyJump redis-jump
+            IdentityFile ~/.ssh/id_rsa
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Redis-1 .env 생성 (master)
         run: |
@@ -146,10 +188,9 @@ jobs:
 
       - name: Redis-2 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }} "mkdir -p ~/infra/redis-vm"
-          scp -r redis-vm/ ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_2_VM_HOST }} \
-            "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
+          ssh redis-2-internal "mkdir -p ~/infra/redis-vm"
+          scp -r redis-vm/ redis-2-internal:~/infra/
+          ssh redis-2-internal "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
 
       - name: Redis-3 .env 생성 (replica)
         run: |
@@ -162,10 +203,9 @@ jobs:
 
       - name: Redis-3 파일 전송 및 배포
         run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }} "mkdir -p ~/infra/redis-vm"
-          scp -r redis-vm/ ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_3_VM_HOST }} \
-            "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
+          ssh redis-3-internal "mkdir -p ~/infra/redis-vm"
+          scp -r redis-vm/ redis-3-internal:~/infra/
+          ssh redis-3-internal "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
 
   deploy-monitoring:
     needs: detect-changes

@@ -1,0 +1,12 @@
+# config.mk.example → config.mk로 복사 후 실제 IP 입력
+# config.mk는 gitignore 처리됨
+
+SSH_USER = your-username
+
+KAFKA_1_EXTERNAL_IP = x.x.x.x
+KAFKA_2_INTERNAL_IP = x.x.x.x
+KAFKA_3_INTERNAL_IP = x.x.x.x
+
+REDIS_1_EXTERNAL_IP = x.x.x.x
+REDIS_2_INTERNAL_IP = x.x.x.x
+REDIS_3_INTERNAL_IP = x.x.x.x

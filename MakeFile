@@ -2,9 +2,22 @@
 # 고글에듀 인프라 Makefile
 # make all-up 하나로 전체 인프라 배포
 # (Config/Service/Payment는 각 앱 레포에서 배포)
+#
+# 사전 준비:
+#   1. config.mk.example을 복사해서 config.mk 생성 후 IP 입력
+#   2. make ssh-config 한 번 실행
+#      → ~/.ssh/config에 ProxyJump 포함 호스트 등록
+#
+# VM 네트워크 구조:
+#   kafka-1  외부 IP 보유 (ProxyJump 기준)
+#   kafka-2/3  외부 IP 없음 → kafka-1 ProxyJump 경유
+#   redis-1  외부 IP 보유 (ProxyJump 기준)
+#   redis-2/3  외부 IP 없음 → redis-1 ProxyJump 경유
 # ================================================
 
-# SSH 호스트 설정 (~/.ssh/config에 등록 필요)
+-include config.mk
+
+SSH_USER      ?= $(shell whoami)
 KAFKA_1_VM    = goggle-kafka-1
 KAFKA_2_VM    = goggle-kafka-2
 KAFKA_3_VM    = goggle-kafka-3
@@ -13,14 +26,25 @@ REDIS_2_VM    = goggle-redis-2
 REDIS_3_VM    = goggle-redis-3
 MONITORING_VM = goggle-monitoring
 
-# 각 VM의 작업 디렉토리
 REMOTE_DIR = ~/infra
 
 .PHONY: all-up all-down \
         kafka-up kafka-down kafka-1-up kafka-2-up kafka-3-up \
         redis-up redis-down redis-1-up redis-2-up redis-3-up \
         monitoring-up monitoring-down \
-        status sync sync-and-up
+        status sync sync-and-up ssh-config
+
+# ── SSH config 초기 설정 ───────────────────────
+ssh-config:
+	@mkdir -p ~/.ssh
+	@printf '\nHost goggle-kafka-1\n  HostName $(KAFKA_1_EXTERNAL_IP)\n  User $(SSH_USER)\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+	@printf '\nHost goggle-kafka-2\n  HostName $(KAFKA_2_INTERNAL_IP)\n  User $(SSH_USER)\n  ProxyJump goggle-kafka-1\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+	@printf '\nHost goggle-kafka-3\n  HostName $(KAFKA_3_INTERNAL_IP)\n  User $(SSH_USER)\n  ProxyJump goggle-kafka-1\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+	@printf '\nHost goggle-redis-1\n  HostName $(REDIS_1_EXTERNAL_IP)\n  User $(SSH_USER)\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+	@printf '\nHost goggle-redis-2\n  HostName $(REDIS_2_INTERNAL_IP)\n  User $(SSH_USER)\n  ProxyJump goggle-redis-1\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+	@printf '\nHost goggle-redis-3\n  HostName $(REDIS_3_INTERNAL_IP)\n  User $(SSH_USER)\n  ProxyJump goggle-redis-1\n  IdentityFile ~/.ssh/id_rsa\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+	@chmod 600 ~/.ssh/config
+	@echo "✅ ~/.ssh/config 등록 완료"
 
 # ── 전체 ──────────────────────────────────────
 all-up: kafka-up redis-up monitoring-up
@@ -34,13 +58,13 @@ kafka-up: kafka-1-up kafka-2-up kafka-3-up
 	@echo "✅ Kafka 클러스터 배포 완료"
 
 kafka-down:
-	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose --profile ui down"
+	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose down"
 	ssh $(KAFKA_2_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose down"
 	ssh $(KAFKA_3_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose down"
 
 kafka-1-up:
 	@echo "🚀 Kafka-1 VM 배포 중..."
-	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose pull && docker compose --profile ui up -d"
+	ssh $(KAFKA_1_VM) "cd $(REMOTE_DIR)/kafka-vm && docker compose pull && docker compose up -d"
 
 kafka-2-up:
 	@echo "🚀 Kafka-2 VM 배포 중..."
@@ -78,7 +102,6 @@ monitoring-up:
 
 monitoring-down:
 	ssh $(MONITORING_VM) "cd $(REMOTE_DIR)/monitoring-vm && docker compose down"
-
 
 # ── 전체 상태 확인 ─────────────────────────────
 status:
