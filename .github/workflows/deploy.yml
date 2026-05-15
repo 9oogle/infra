@@ -35,34 +35,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH 키 설정
+      - name: 필수 변수 확인
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-          cat >> ~/.ssh/config << EOF
-          Host kafka-jump
-            HostName ${{ secrets.KAFKA_1_VM_HOST }}
-            User ${{ secrets.SSH_USER }}
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-
-          Host kafka-2-internal
-            HostName ${{ secrets.KAFKA_2_INTERNAL_IP }}
-            User ${{ secrets.SSH_USER }}
-            ProxyJump kafka-jump
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-
-          Host kafka-3-internal
-            HostName ${{ secrets.KAFKA_3_INTERNAL_IP }}
-            User ${{ secrets.SSH_USER }}
-            ProxyJump kafka-jump
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-          EOF
-          chmod 600 ~/.ssh/config
+          missing=()
+          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]      && missing+=("secrets.SSH_PRIVATE_KEY")
+          [ -z "${{ secrets.SSH_USER }}" ]              && missing+=("secrets.SSH_USER")
+          [ -z "${{ secrets.KAFKA_1_VM_HOST }}" ]       && missing+=("secrets.KAFKA_1_VM_HOST")
+          [ -z "${{ secrets.KAFKA_CLUSTER_ID }}" ]      && missing+=("secrets.KAFKA_CLUSTER_ID")
+          [ -z "${{ secrets.KAFKA_1_INTERNAL_IP }}" ]   && missing+=("secrets.KAFKA_1_INTERNAL_IP")
+          [ -z "${{ secrets.KAFKA_2_INTERNAL_IP }}" ]   && missing+=("secrets.KAFKA_2_INTERNAL_IP")
+          [ -z "${{ secrets.KAFKA_3_INTERNAL_IP }}" ]   && missing+=("secrets.KAFKA_3_INTERNAL_IP")
+          [ -z "${{ secrets.TRUST_STORE_PASSWORD }}" ]  && missing+=("secrets.TRUST_STORE_PASSWORD")
+          [ -z "${{ secrets.MONITORING_VM_HOST }}" ]    && missing+=("secrets.MONITORING_VM_HOST")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "❌ 누락된 변수/시크릿:"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo "✅ 모든 변수 확인 완료"
 
       - name: Kafka-1 .env 생성
         run: |
@@ -78,12 +68,30 @@ jobs:
           TRUSTSTORE_PASSWORD=${{ secrets.TRUST_STORE_PASSWORD }}
           EOF
 
-      - name: Kafka-1 파일 전송 및 배포
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }} "mkdir -p ~/infra/kafka-vm"
-          scp -r kafka-vm/ ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.KAFKA_1_VM_HOST }} \
-            "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
+      - name: Kafka-1 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.KAFKA_1_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/infra
+
+      - name: Kafka-1 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.KAFKA_1_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "kafka-vm"
+          target: "~/infra"
+
+      - name: Kafka-1 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.KAFKA_1_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/kafka-vm && docker compose pull && docker compose up -d
 
       - name: Kafka-2 .env 생성
         run: |
@@ -99,11 +107,39 @@ jobs:
           TRUSTSTORE_PASSWORD=${{ secrets.TRUST_STORE_PASSWORD }}
           EOF
 
-      - name: Kafka-2 파일 전송 및 배포
-        run: |
-          ssh kafka-2-internal "mkdir -p ~/infra/kafka-vm"
-          scp -r kafka-vm/ kafka-2-internal:~/infra/
-          ssh kafka-2-internal "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
+      - name: Kafka-2 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.KAFKA_2_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/infra
+
+      - name: Kafka-2 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.KAFKA_2_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "kafka-vm"
+          target: "~/infra"
+
+      - name: Kafka-2 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.KAFKA_2_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/kafka-vm && docker compose pull && docker compose up -d
 
       - name: Kafka-3 .env 생성
         run: |
@@ -119,11 +155,46 @@ jobs:
           TRUSTSTORE_PASSWORD=${{ secrets.TRUST_STORE_PASSWORD }}
           EOF
 
-      - name: Kafka-3 파일 전송 및 배포
-        run: |
-          ssh kafka-3-internal "mkdir -p ~/infra/kafka-vm"
-          scp -r kafka-vm/ kafka-3-internal:~/infra/
-          ssh kafka-3-internal "cd ~/infra/kafka-vm && docker compose pull && docker compose up -d"
+      - name: Kafka-3 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.KAFKA_3_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "[DEBUG] whoami: $(whoami)"
+            echo "[DEBUG] uid/gid: $(id)"
+            echo "[DEBUG] HOME: $HOME"
+            echo "[DEBUG] ~ 권한: $(ls -la / | grep home || echo 'no home dir')"
+            echo "[DEBUG] home 내부: $(ls -la /home/ 2>&1)"
+            echo "[DEBUG] 해당 유저 디렉토리: $(ls -la /home/$(whoami) 2>&1)"
+            mkdir -p ~/infra
+
+      - name: Kafka-3 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.KAFKA_3_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "kafka-vm"
+          target: "~/infra"
+
+      - name: Kafka-3 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.KAFKA_3_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/kafka-vm && docker compose pull && docker compose up -d
 
   deploy-redis:
     needs: detect-changes
@@ -132,34 +203,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH 키 설정
+      - name: 필수 변수 확인
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-          cat >> ~/.ssh/config << EOF
-          Host redis-jump
-            HostName ${{ secrets.REDIS_1_VM_HOST }}
-            User ${{ secrets.SSH_USER }}
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-
-          Host redis-2-internal
-            HostName ${{ secrets.REDIS_2_INTERNAL_IP }}
-            User ${{ secrets.SSH_USER }}
-            ProxyJump redis-jump
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-
-          Host redis-3-internal
-            HostName ${{ secrets.REDIS_3_INTERNAL_IP }}
-            User ${{ secrets.SSH_USER }}
-            ProxyJump redis-jump
-            IdentityFile ~/.ssh/id_rsa
-            StrictHostKeyChecking no
-          EOF
-          chmod 600 ~/.ssh/config
+          missing=()
+          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]      && missing+=("secrets.SSH_PRIVATE_KEY")
+          [ -z "${{ secrets.SSH_USER }}" ]              && missing+=("secrets.SSH_USER")
+          [ -z "${{ secrets.REDIS_1_VM_HOST }}" ]       && missing+=("secrets.REDIS_1_VM_HOST")
+          [ -z "${{ secrets.REDIS_PASSWORD }}" ]        && missing+=("secrets.REDIS_PASSWORD")
+          [ -z "${{ secrets.REDIS_1_INTERNAL_IP }}" ]   && missing+=("secrets.REDIS_1_INTERNAL_IP")
+          [ -z "${{ secrets.REDIS_2_INTERNAL_IP }}" ]   && missing+=("secrets.REDIS_2_INTERNAL_IP")
+          [ -z "${{ secrets.REDIS_3_INTERNAL_IP }}" ]   && missing+=("secrets.REDIS_3_INTERNAL_IP")
+          [ -z "${{ secrets.MONITORING_VM_HOST }}" ]    && missing+=("secrets.MONITORING_VM_HOST")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "❌ 누락된 변수/시크릿:"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo "✅ 모든 변수 확인 완료"
 
       - name: Redis-1 .env 생성 (master)
         run: |
@@ -170,12 +230,30 @@ jobs:
           LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
           EOF
 
-      - name: Redis-1 파일 전송 및 배포
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }} "mkdir -p ~/infra/redis-vm"
-          scp -r redis-vm/ ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.REDIS_1_VM_HOST }} \
-            "cd ~/infra/redis-vm && docker compose pull && docker compose --profile master up -d"
+      - name: Redis-1 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REDIS_1_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/infra
+
+      - name: Redis-1 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REDIS_1_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "redis-vm"
+          target: "~/infra"
+
+      - name: Redis-1 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REDIS_1_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/redis-vm && docker compose pull && docker compose --profile master up -d
 
       - name: Redis-2 .env 생성 (replica)
         run: |
@@ -186,11 +264,39 @@ jobs:
           LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
           EOF
 
-      - name: Redis-2 파일 전송 및 배포
-        run: |
-          ssh redis-2-internal "mkdir -p ~/infra/redis-vm"
-          scp -r redis-vm/ redis-2-internal:~/infra/
-          ssh redis-2-internal "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
+      - name: Redis-2 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REDIS_2_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.REDIS_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/infra
+
+      - name: Redis-2 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REDIS_2_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.REDIS_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "redis-vm"
+          target: "~/infra"
+
+      - name: Redis-2 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REDIS_2_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.REDIS_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d
 
       - name: Redis-3 .env 생성 (replica)
         run: |
@@ -201,11 +307,39 @@ jobs:
           LOKI_HOST=${{ secrets.MONITORING_VM_HOST }}
           EOF
 
-      - name: Redis-3 파일 전송 및 배포
-        run: |
-          ssh redis-3-internal "mkdir -p ~/infra/redis-vm"
-          scp -r redis-vm/ redis-3-internal:~/infra/
-          ssh redis-3-internal "cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d"
+      - name: Redis-3 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REDIS_3_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.REDIS_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/infra
+
+      - name: Redis-3 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REDIS_3_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.REDIS_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "redis-vm"
+          target: "~/infra"
+
+      - name: Redis-3 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.REDIS_3_INTERNAL_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          proxy_host: ${{ secrets.REDIS_1_VM_HOST }}
+          proxy_username: ${{ secrets.SSH_USER }}
+          proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/redis-vm && docker compose pull && docker compose --profile replica up -d
 
   deploy-monitoring:
     needs: detect-changes
@@ -214,12 +348,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: SSH 키 설정
+      - name: 필수 변수 확인
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          echo "${{ secrets.KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          missing=()
+          [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]      && missing+=("secrets.SSH_PRIVATE_KEY")
+          [ -z "${{ secrets.SSH_USER }}" ]              && missing+=("secrets.SSH_USER")
+          [ -z "${{ secrets.MONITORING_VM_HOST }}" ]    && missing+=("secrets.MONITORING_VM_HOST")
+          [ -z "${{ secrets.GRAFANA_PASSWORD }}" ]      && missing+=("secrets.GRAFANA_PASSWORD")
+          [ -z "${{ secrets.TRUST_STORE_PASSWORD }}" ]  && missing+=("secrets.TRUST_STORE_PASSWORD")
+          [ -z "${{ secrets.TRUSTSTORE_JKS_B64 }}" ]   && missing+=("secrets.TRUSTSTORE_JKS_B64")
+          [ -z "${{ secrets.KAFKA_1_INTERNAL_IP }}" ]   && missing+=("secrets.KAFKA_1_INTERNAL_IP")
+          [ -z "${{ secrets.KAFKA_2_INTERNAL_IP }}" ]   && missing+=("secrets.KAFKA_2_INTERNAL_IP")
+          [ -z "${{ secrets.KAFKA_3_INTERNAL_IP }}" ]   && missing+=("secrets.KAFKA_3_INTERNAL_IP")
+          [ -z "${{ secrets.REDIS_1_INTERNAL_IP }}" ]   && missing+=("secrets.REDIS_1_INTERNAL_IP")
+          [ -z "${{ secrets.REDIS_2_INTERNAL_IP }}" ]   && missing+=("secrets.REDIS_2_INTERNAL_IP")
+          [ -z "${{ secrets.REDIS_3_INTERNAL_IP }}" ]   && missing+=("secrets.REDIS_3_INTERNAL_IP")
+          [ -z "${{ secrets.VM_HOST }}" ]               && missing+=("secrets.VM_HOST")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "❌ 누락된 변수/시크릿:"
+            printf '  - %s\n' "${missing[@]}"
+            exit 1
+          fi
+          echo "✅ 모든 변수 확인 완료"
 
       - name: 모니터링 .env 생성
         run: |
@@ -244,9 +394,27 @@ jobs:
           mkdir -p monitoring-vm/ssl
           echo "${{ secrets.TRUSTSTORE_JKS_B64 }}" | base64 -d > monitoring-vm/ssl/kafka.truststore.jks
 
-      - name: 모니터링 파일 전송 및 배포
-        run: |
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} "mkdir -p ~/infra/monitoring-vm"
-          scp -r monitoring-vm/ ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }}:~/infra/
-          ssh ${{ secrets.SSH_USER }}@${{ secrets.MONITORING_VM_HOST }} \
-            "cd ~/infra/monitoring-vm && docker compose pull && docker compose up -d"
+      - name: 모니터링 디렉토리 생성
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.MONITORING_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/infra
+
+      - name: 모니터링 파일 전송
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.MONITORING_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "monitoring-vm"
+          target: "~/infra"
+
+      - name: 모니터링 배포
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.MONITORING_VM_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: cd ~/infra/monitoring-vm && docker compose pull && docker compose up -d

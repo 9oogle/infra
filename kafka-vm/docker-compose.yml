@@ -35,8 +35,7 @@ services:
       KAFKA_SSL_CLIENT_AUTH: none
       KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
     volumes:
-      - kaf
-      - ka-data:/var/lib/kafka/data
+      - kafka-data:/var/lib/kafka/data
       - ./ssl:/etc/kafka/secrets
     restart: unless-stopped
 
