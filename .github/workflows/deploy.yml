@@ -35,6 +35,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: SCP 전송 준비 (ssl 제외)
+        run: rm -rf kafka-vm/ssl
+
       - name: 필수 변수 확인
         run: |
           missing=()
@@ -164,14 +167,7 @@ jobs:
           proxy_host: ${{ secrets.KAFKA_1_VM_HOST }}
           proxy_username: ${{ secrets.SSH_USER }}
           proxy_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            echo "[DEBUG] whoami: $(whoami)"
-            echo "[DEBUG] uid/gid: $(id)"
-            echo "[DEBUG] HOME: $HOME"
-            echo "[DEBUG] ~ 권한: $(ls -la / | grep home || echo 'no home dir')"
-            echo "[DEBUG] home 내부: $(ls -la /home/ 2>&1)"
-            echo "[DEBUG] 해당 유저 디렉토리: $(ls -la /home/$(whoami) 2>&1)"
-            mkdir -p ~/infra
+          script: mkdir -p ~/infra
 
       - name: Kafka-3 파일 전송
         uses: appleboy/scp-action@v0.1.7
