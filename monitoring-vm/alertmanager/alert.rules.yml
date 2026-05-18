@@ -1,0 +1,85 @@
+groups:
+  - name: basic-alerts-rules
+    rules:
+      # Latency: 응답 속도 지연 (Golden Signal - Latency)
+      - alert: HighResponseTime
+        expr: |
+          (rate(http_server_requests_seconds_sum[1m]) / rate(http_server_requests_seconds_count[1m])) > 2.0
+        for: 1m
+        labels:
+          severity: warning
+          category: latency
+        annotations:
+          summary: "API 응답 지연 발생"
+          description: "최근 1분간 평균 응답 시간이 {{ $value | printf \"%.2f\" }}s를 기록 중입니다. (임계치: 2s)"
+
+      # CPU Saturation: 앱과 시스템 CPU를 동시에 감시 (Golden Signal - Saturation)
+      # 앱 사용량이 80%를 넘거나, 시스템 전체 부하가 90%를 넘을 때 발생
+      - alert: HighCpuUsage
+        expr: process_cpu_usage > 0.8 or system_cpu_usage > 0.9
+        for: 2m
+        labels:
+          severity: critical
+          category: cpu
+        annotations:
+          summary: "CPU 부하 위험 수준"
+          description: "현재 App CPU: {{ with query \"process_cpu_usage\" }}{{ . | first | value | humanizePercentage }}{{ end }}, System CPU: {{ with query \"system_cpu_usage\" }}{{ . | first | value | humanizePercentage }}{{ end }}. 리소스 고갈이 의심됩니다."
+
+      # Memory Saturation: Old Gen 및 메모리 릭 감시
+      - alert: HighHeapMemoryUsage
+        expr: |
+          (jvm_memory_used_bytes{area="heap", id=~".*Old Gen.*"} / jvm_memory_max_bytes{area="heap", id=~".*Old Gen.*"}) * 100 > 85
+        for: 2m
+        labels:
+          severity: critical
+          category: memory
+        annotations:
+          summary: "JVM Old Gen 메모리 고갈"
+          description: "Old Gen 사용률이 {{ $value | printf \"%.1f\" }}%입니다. Full GC 이후에도 감소하지 않는지 확인이 필요합니다."
+
+      # Errors: 5xx 에러 급증 (Golden Signal - Errors)
+      - alert: APIErrorRateHigh
+        expr: |
+          sum by (service, instance, job) (rate(http_server_requests_seconds_count{status=~"5.."}[1m]))
+          / sum by (service, instance, job) (rate(http_server_requests_seconds_count[1m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+          category: error
+        annotations:
+          summary: "API 에러율 급증 (5% 초과)"
+          description: "현재 에러율: {{ $value | humanizePercentage }}. Loki 로그에서 StackTrace 확인이 시급합니다."
+
+      # GC Overhead: 실제 Stop-the-World 발생 빈도 감시
+      # 단순 횟수가 아닌 1분 내 GC 정지 시간이 5초를 초과할 때 (실질적 서비스 영향도)
+      - alert: CriticalGCPause
+        expr: rate(jvm_gc_pause_seconds_sum[1m]) > 0.08
+        for: 1m
+        labels:
+          severity: warning
+          category: gc
+        annotations:
+          summary: "과도한 GC 정지 시간 발생"
+          description: "최근 1분간 초당 GC 정지 시간이 0.08s를 초과했습니다. 애플리케이션 프리징 가능성이 있습니다."
+
+      # Connection Pool: DB 커넥션 부족
+      - alert: HikariPoolExhausted
+        expr: hikaricp_connections_active > (hikaricp_connections_max * 0.9)
+        for: 1m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "DB 커넥션 풀 고갈 위기"
+          description: "활성 커넥션이 최대치의 90%에 도달했습니다. (현재: {{ $value }})"
+
+      # Instance Down: 서버 응답 없음 (Critical)
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "인스턴스 중단 감지"
+          description: "{{ $labels.instance }} 서버가 1분 이상 응답하지 않습니다. 즉시 확인이 필요합니다."

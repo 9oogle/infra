@@ -1,0 +1,12 @@
+route:
+  receiver: 'spring-ai-analyzer'
+  group_by: ['alertname']
+  group_wait: 5m          # 10s → 5m
+  group_interval: 30m     # 5m → 30m
+  repeat_interval: 6h     # 1m → 6h
+
+receivers:
+  - name: 'spring-ai-analyzer'
+    webhook_configs:
+      - url: 'http://${SERVICE_HOST}:11000/api/v1/alerts'
+        send_resolved: true
