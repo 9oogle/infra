@@ -16,6 +16,7 @@ services:
     volumes:
       - prometheus-config:/etc/prometheus
       - prometheus-data:/prometheus
+      - ./alertmanager/alert.rules.yml:/etc/prometheus/alert.rules.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
@@ -34,8 +35,10 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+      - loki
     restart: unless-stopped
 
   loki:
@@ -86,6 +89,17 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer-data:/data
     restart: unless-stopped
+
+  alertmanager:
+    container_name: alertmanager
+    image: prom/alertmanager
+    ports:
+      - '9093:9093'
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager-config.yml
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager-config.yml'
 
 volumes:
   prometheus-config:

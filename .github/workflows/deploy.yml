@@ -2,7 +2,7 @@ name: 인프라 자동 배포
 
 on:
   push:
-    branches: [main]
+    branches: [main,feat/3-alertmanager-setting]
   workflow_dispatch:
 
 jobs:
@@ -383,6 +383,7 @@ jobs:
           LECTURE_SERVICE_HOST=${{ secrets.VM_HOST }}
           PAYMENT_SERVICE_HOST=${{ secrets.VM_HOST }}
           USER_SERVICE_HOST=${{ secrets.VM_HOST }}
+          SERVICE_HOST=${{ secrets.VM_HOST }}
           EOF
 
       - name: 모니터링 SSL truststore 복원
